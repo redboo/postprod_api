@@ -1,5 +1,3 @@
-# https://github.com/redboo/easy-google-docs/blob/master/easygoogledocs/__init__.py
-
 import json
 from typing import Union
 
@@ -49,34 +47,7 @@ class GoogleAPI:
                 "for instructions on how to obtain this file. "
             )
 
-        credentials = None
-
-        if authentication_type == AUTH_TYPE_SERVICE_ACCOUNT:
-            # A complete list of scopes can be found at: https://developers.google.com/identity/protocols/googlescopes#drive
-            SCOPES = [
-                "https://www.googleapis.com/auth/documents",
-                "https://www.googleapis.com/auth/drive",
-                "https://www.googleapis.com/auth/drive.file",
-                "https://www.googleapis.com/auth/drive.appdata",
-                "https://www.googleapis.com/auth/drive.metadata",
-            ]
-            if self.CREDENTIALS:
-                credentials = service_account.Credentials.from_service_account_file(
-                    self.CREDENTIALS, scopes=SCOPES
-                )
-                with open(self.CREDENTIALS) as f:
-                    cred_obj = json.load(f)
-                    self.service_email = cred_obj["client_email"]
-            if self.CREDENTIALS_JSON:
-                credentials = service_account.Credentials.from_service_account_info(
-                    self.CREDENTIALS_JSON, scopes=SCOPES
-                )
-                self.service_email = self.CREDENTIALS_JSON["client_email"]
-
-        if authentication_type != AUTH_TYPE_SERVICE_ACCOUNT:
-            raise AttributeError(
-                f"Unsupported authentication type: `{authentication_type}`"
-            )
+        credentials = self._get_credentials(authentication_type)
 
         self.auth_type = authentication_type
 
@@ -87,6 +58,41 @@ class GoogleAPI:
         self.doc_service = build("docs", self._doc_version, credentials=credentials)
 
         return True
+
+    def _get_credentials(self, authentication_type: str):
+        if authentication_type == AUTH_TYPE_SERVICE_ACCOUNT:
+            return self._get_service_account_credentials()
+        else:
+            raise AttributeError(
+                f"Unsupported authentication type: `{authentication_type}`"
+            )
+
+    def _get_service_account_credentials(self):
+        # A complete list of scopes can be found at: https://developers.google.com/identity/protocols/googlescopes#drive
+        SCOPES = [
+            "https://www.googleapis.com/auth/documents",
+            "https://www.googleapis.com/auth/drive",
+            "https://www.googleapis.com/auth/drive.file",
+            "https://www.googleapis.com/auth/drive.appdata",
+            "https://www.googleapis.com/auth/drive.metadata",
+        ]
+
+        if self.CREDENTIALS:
+            credentials = service_account.Credentials.from_service_account_file(
+                self.CREDENTIALS, scopes=SCOPES
+            )
+            with open(self.CREDENTIALS) as f:
+                cred_obj = json.load(f)
+                self.service_email = cred_obj["client_email"]
+        elif self.CREDENTIALS_JSON:
+            credentials = service_account.Credentials.from_service_account_info(
+                self.CREDENTIALS_JSON, scopes=SCOPES
+            )
+            self.service_email = self.CREDENTIALS_JSON["client_email"]
+        else:
+            raise FileNotFoundError("No service account credentials provided.")
+
+        return credentials
 
     def get_file_name(self, file_id):
         if self.drive_service:

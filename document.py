@@ -38,7 +38,7 @@ class Document:
             for value in element.values() if isinstance(element, dict) else element:
                 content_list.extend(self.extract_text_content_recursive(value))
 
-        return "".join(content_list) if content_list else ""
+        return "".join(content_list)
 
     def extract_words(self):
         # Заменить повторяющиеся символы '\n' на одиночный символ '\n'
@@ -79,6 +79,7 @@ class Document:
             word
             for word in words_list
             if any(char not in string.punctuation for char in word)
+            and not word.isspace()
         ]
 
     def find_urls(self):
