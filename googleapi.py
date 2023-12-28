@@ -2,6 +2,7 @@ import json
 from typing import Union
 
 from google.oauth2 import service_account
+from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from icecream import ic
 
@@ -59,7 +60,7 @@ class GoogleAPI:
 
         return True
 
-    def _get_credentials(self, authentication_type: str):
+    def _get_credentials(self, authentication_type: str) -> Credentials:
         if authentication_type == AUTH_TYPE_SERVICE_ACCOUNT:
             return self._get_service_account_credentials()
         else:
@@ -67,9 +68,9 @@ class GoogleAPI:
                 f"Unsupported authentication type: `{authentication_type}`"
             )
 
-    def _get_service_account_credentials(self):
+    def _get_service_account_credentials(self) -> Credentials:
         # A complete list of scopes can be found at: https://developers.google.com/identity/protocols/googlescopes#drive
-        SCOPES = [
+        SCOPES: list[str] = [
             "https://www.googleapis.com/auth/documents",
             "https://www.googleapis.com/auth/drive",
             "https://www.googleapis.com/auth/drive.file",
@@ -78,8 +79,10 @@ class GoogleAPI:
         ]
 
         if self.CREDENTIALS:
-            credentials = service_account.Credentials.from_service_account_file(
-                self.CREDENTIALS, scopes=SCOPES
+            credentials: Credentials = (
+                service_account.Credentials.from_service_account_file(
+                    self.CREDENTIALS, scopes=SCOPES
+                )
             )
             with open(self.CREDENTIALS) as f:
                 cred_obj = json.load(f)

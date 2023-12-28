@@ -5,7 +5,7 @@ import emoji
 
 
 class Document:
-    def __init__(self, json_data, count_emoji=False):
+    def __init__(self, json_data, count_emoji=False) -> None:
         self.json_data = json_data or {}
         self.raw_content = self.extract_text_content_recursive(
             self.json_data.get("body", {}).get("content", None)
@@ -24,7 +24,7 @@ class Document:
         self.word_count = len(self.word_list)
         self.urls = self.find_urls()
 
-    def extract_text_content_recursive(self, element):
+    def extract_text_content_recursive(self, element) -> str:
         content_list = []
 
         if (
@@ -40,12 +40,12 @@ class Document:
 
         return "".join(content_list)
 
-    def extract_words(self):
+    def extract_words(self) -> list[str]:
         # Заменить повторяющиеся символы '\n' на одиночный символ '\n'
-        words_with_spaces = re.sub(r"\n+", " ", self.raw_content)
+        words_with_spaces: str = re.sub(r"\n+", " ", self.raw_content)
 
         # Разделить текст на слова, заменяя определенные знаки пунктуации на пробелы
-        words_list = (
+        words_list: list[str] = (
             words_with_spaces.strip()
             .replace(",", " ")
             .replace(".", " ")
@@ -82,11 +82,11 @@ class Document:
             and not word.isspace()
         ]
 
-    def find_urls(self):
+    def find_urls(self) -> list[str]:
         # Рекурсивный поиск всех URL в структуре данных
-        urls = []
+        urls: list[str] = []
 
-        def extract_urls(element):
+        def extract_urls(element) -> None:
             if isinstance(element, dict):
                 for key, value in element.items():
                     if key == "url" and isinstance(value, str):
