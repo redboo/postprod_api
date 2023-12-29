@@ -1,18 +1,27 @@
+import json
 import re
 import string
 
 import emoji
+from icecream import ic
 
 
 class Document:
-    def __init__(self, json_data, count_emoji=False) -> None:
+    def __init__(self, json_data, count_emoji=False, first_table_only=False) -> None:
         self.json_data = json_data or {}
-        self.raw_content = self.extract_text_content_recursive(
-            self.json_data.get("body", {}).get("content", None)
-        )
+
+        if first_table_only:
+            self.tables = self.find_tables()
+            self.data = self.tables[0]["tableRows"][1]
+            self.image_count = len(self.find_images())
+
+        else:
+            self.data = self.json_data.get("body", {}).get("content", None)
+            self.image_count = len(self.json_data.get("inlineObjects", []))
+
+        self.raw_content = self.extract_text_content_recursive(self.data)
         self.plain_text = self.raw_content.replace("\n", "")
         self.count_emoji = emoji.emoji_count(self.plain_text) if count_emoji else 0
-        self.image_count = len(self.json_data.get("inlineObjects", []))
         self.total_characters = (
             len(self.plain_text) + self.image_count + self.count_emoji
         )
@@ -97,5 +106,54 @@ class Document:
                 for item in element:
                     extract_urls(item)
 
-        extract_urls(self.json_data)
+        extract_urls(self.data)
         return urls
+
+    def save_json(self, file_path: str, json_data=None) -> None:
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(json_data or self.json_data, f, ensure_ascii=False, indent=4)
+
+    def find_tables(self) -> list[dict]:
+        tables: list[dict] = []
+
+        def extract_tables(element) -> None:
+            if isinstance(element, dict):
+                for key, value in element.items():
+                    if key == "table" and isinstance(value, dict):
+                        tables.append(value)
+                    else:
+                        extract_tables(value)
+            elif isinstance(element, list):
+                for item in element:
+                    extract_tables(item)
+
+        extract_tables(self.json_data)
+        return tables
+
+    def get_rows_content(self, table: dict) -> list[str]:
+        rows = list(table["tableRows"])
+        return [self.extract_text_content_recursive(row) for row in rows]
+
+    def find_images(self) -> list[dict]:
+        images: list[dict] = []
+
+        def extract_images(element) -> None:
+            if isinstance(element, dict):
+                for key, value in element.items():
+                    if key == "inlineObjectElement" and isinstance(value, dict):
+                        images.append(value)
+                    else:
+                        extract_images(value)
+            elif isinstance(element, list):
+                for item in element:
+                    extract_images(item)
+
+        extract_images(self.data)
+        return images
+
+    def info(self) -> None:
+        ic("Количество слов", self.word_count)
+        ic("Количество знаков", self.total_characters)
+        ic("Количество знаков без пробелов", self.characters_without_spaces)
+        ic("Количество изображений", self.image_count)
+        ic(len(self.urls), self.urls)
