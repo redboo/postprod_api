@@ -4,6 +4,7 @@ from typing import Union
 from google.oauth2 import service_account
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 from icecream import ic
 
 # Levels of sharing permissions
@@ -97,13 +98,23 @@ class GoogleAPI:
 
         return credentials
 
-    def get_file_name(self, file_id):
-        if self.drive_service:
-            return (
-                self.drive_service.files()
-                .get(fileId=file_id, fields="name")
-                .execute()["name"]
-            )
+    def extract_file_id_from_url(self, file_id: str) -> str:
+        return file_id.split("/")[-2] if file_id.startswith("https://") else file_id
+
+    def get_file_name(self, file_id: str):
+        try:
+            file_id = self.extract_file_id_from_url(file_id)
+            if self.drive_service:
+                return (
+                    self.drive_service.files()
+                    .get(fileId=file_id, fields="name")
+                    .execute()["name"]
+                )
+        except HttpError as e:
+            if e.resp.status == 404:
+                print(f"Файл с ID {file_id} не найден.")
+            else:
+                print(f"Ошибка при получении имени файла: {e}")
 
         return None
 
@@ -124,14 +135,24 @@ class GoogleAPI:
         return False
 
     def delete_file(self, file_id):
+        file_id = self.extract_file_id_from_url(file_id)
         if self.drive_service:
             return self.drive_service.files().delete(fileId=file_id).execute()
 
         return None
 
-    def get_document(self, file_id):
-        if self.doc_service:
-            return self.doc_service.documents().get(documentId=file_id).execute()
+    def get_document(self, file_id: str):
+        try:
+            file_id = self.extract_file_id_from_url(file_id)
+            if self.doc_service:
+                return self.doc_service.documents().get(documentId=file_id).execute()
+        except HttpError as e:
+            if e.resp.status == 403:
+                print(
+                    f"У вас нет прав для просмотра документа с ID {file_id}. Проверьте права доступа."
+                )
+            else:
+                print(f"Ошибка при получении документа: {e}")
 
         return None
 
