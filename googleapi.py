@@ -53,6 +53,7 @@ class GoogleAPI:
         self._doc_version = "v1"
 
     def authorize(self, authentication_type: Union[str, None] = None) -> bool:
+        """Authorize the Google API client."""
         if not authentication_type:
             authentication_type = AUTH_TYPE_SERVICE_ACCOUNT
 
@@ -76,6 +77,7 @@ class GoogleAPI:
         return True
 
     def _get_credentials(self, authentication_type: str) -> Credentials:
+        """Get the appropriate credentials based on the authentication type."""
         if authentication_type == AUTH_TYPE_SERVICE_ACCOUNT:
             return self._get_service_account_credentials()
         else:
@@ -84,6 +86,7 @@ class GoogleAPI:
             )
 
     def _get_service_account_credentials(self) -> Credentials:
+        """Get the service account credentials."""
         # A complete list of scopes can be found at: https://developers.google.com/identity/protocols/googlescopes#drive
         SCOPES: list[str] = [
             "https://www.googleapis.com/auth/documents",
@@ -113,9 +116,11 @@ class GoogleAPI:
         return credentials
 
     def extract_file_id_from_url(self, file_id: str) -> str:
+        """Extract the file ID from a Google Drive URL."""
         return file_id.split("/")[-2] if file_id.startswith("https://") else file_id
 
-    def get_file_name(self, file_id: str):
+    def get_file_name(self, file_id: str) -> Union[str, None]:
+        """Get the name of a file by its ID."""
         try:
             file_id = self.extract_file_id_from_url(file_id)
             if self.drive_service:
@@ -132,13 +137,15 @@ class GoogleAPI:
 
         return None
 
-    def get_files(self):
+    def get_files(self) -> Union[dict, None]:
+        """Get a list of all files."""
         if self.drive_service:
             return self.drive_service.files().list().execute()
 
         return None
 
     def delete_all_files(self) -> bool:
+        """Delete all files."""
         if self.drive_service:
             if files := self.get_files():
                 file_ids = [file["id"] for file in files.get("files", [])]
@@ -148,14 +155,16 @@ class GoogleAPI:
 
         return False
 
-    def delete_file(self, file_id):
+    def delete_file(self, file_id: str) -> Union[None, dict]:
+        """Delete a file by its ID."""
         file_id = self.extract_file_id_from_url(file_id)
         if self.drive_service:
             return self.drive_service.files().delete(fileId=file_id).execute()
 
         return None
 
-    def get_document(self, file_id: str):
+    def get_document(self, file_id: str) -> Union[None, dict]:
+        """Get the content of a document by its ID."""
         try:
             file_id = self.extract_file_id_from_url(file_id)
             if self.doc_service:
@@ -171,10 +180,8 @@ class GoogleAPI:
         return None
 
     # More about permissions: https://developers.google.com/drive/api/reference/rest/v3/permissions?hl=ru
-    def get_permissions(
-        self,
-        file_id: str,
-    ):
+    def get_permissions(self, file_id: str) -> Union[None, list[dict]]:
+        """Get the permissions of a file by its ID."""
         try:
             file_id = self.extract_file_id_from_url(file_id)
             if self.drive_service:
@@ -198,7 +205,8 @@ class GoogleAPI:
         file_id: str,
         user_email: str,
         role: Permissions,
-    ):
+    ) -> Union[None, dict]:
+        """Add permissions to a file."""
         try:
             file_id = self.extract_file_id_from_url(file_id)
             if self.drive_service:
@@ -229,7 +237,8 @@ class GoogleAPI:
         file_id: str,
         user_email: Union[str, None] = None,
         user_id: Union[int, None] = None,
-    ):
+    ) -> Union[None, dict]:
+        """Delete permissions from a file."""
         if not user_id and not user_email:
             raise ValueError("Вы должны указать user_id или user_email")
 
@@ -277,6 +286,7 @@ class GoogleAPI:
         return None
 
     def get_file_link(self, file: dict) -> str:
+        """Get the shareable link for a file."""
         link: str = ""
         mime_type = MimeTypes(file.get("mimeType", ""))
 
