@@ -1,4 +1,5 @@
 import json
+from enum import Enum
 from typing import Union
 
 from google.oauth2 import service_account
@@ -7,12 +8,25 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from icecream import ic
 
-# Levels of sharing permissions
-PERMISSION_READ = "reader"
-PERMISSION_WRITE = "writer"
-PERMISSION_OWNER = "owner"
-
 AUTH_TYPE_SERVICE_ACCOUNT = "service_account"
+
+
+class Permissions(Enum):
+    """Levels of sharing permissions"""
+
+    READ = "reader"
+    COMMENT = "commenter"
+    WRITE = "writer"
+    OWNER = "owner"
+
+
+class MimeTypes(Enum):
+    """Mime types for Google Drive files"""
+
+    FOLDER = "application/vnd.google-apps.folder"
+    DOCUMENT = "application/vnd.google-apps.document"
+    SPREADSHEET = "application/vnd.google-apps.spreadsheet"
+    PRESENTATION = "application/vnd.google-apps.presentation"
 
 
 class GoogleAPI:
@@ -156,6 +170,123 @@ class GoogleAPI:
 
         return None
 
+    # More about permissions: https://developers.google.com/drive/api/reference/rest/v3/permissions?hl=ru
+    def get_permissions(
+        self,
+        file_id: str,
+    ):
+        try:
+            file_id = self.extract_file_id_from_url(file_id)
+            if self.drive_service:
+                return (
+                    self.drive_service.permissions()
+                    .list(fileId=file_id, fields="*")
+                    .execute()
+                ).get("permissions", [])
+        except HttpError as e:
+            if e.resp.status == 403:
+                print(
+                    f"У вас нет прав для просмотра документа с ID {file_id}. Проверьте права доступа."
+                )
+            else:
+                print(f"Ошибка при получении разрешений для документа: {e}")
+
+        return None
+
+    def add_permissions(
+        self,
+        file_id: str,
+        user_email: str,
+        role: Permissions,
+    ):
+        try:
+            file_id = self.extract_file_id_from_url(file_id)
+            if self.drive_service:
+                return (
+                    self.drive_service.permissions()
+                    .create(
+                        fileId=file_id,
+                        body={
+                            "type": "user",
+                            "role": role.value,
+                            "emailAddress": user_email,
+                        },
+                    )
+                    .execute()
+                )
+        except HttpError as e:
+            if e.resp.status == 403:
+                print(
+                    f"У вас нет прав для просмотра документа с ID {file_id}. Проверьте права доступа."
+                )
+            else:
+                print(f"Ошибка при добавлении разрешений для документа: {e}")
+
+        return None
+
+    def delete_permissions(
+        self,
+        file_id: str,
+        user_email: Union[str, None] = None,
+        user_id: Union[int, None] = None,
+    ):
+        if not user_id and not user_email:
+            raise ValueError("Вы должны указать user_id или user_email")
+
+        try:
+            file_id = self.extract_file_id_from_url(file_id)
+            permissions_list = self.get_permissions(file_id)
+
+            if permissions_list is None:
+                print(
+                    f"Не удалось получить список разрешений для файла с ID {file_id}."
+                )
+                return None
+
+            if user_email:
+                matching_permissions = next(
+                    (
+                        permission["id"]
+                        for permission in permissions_list
+                        if permission.get("emailAddress") == user_email
+                    ),
+                    None,
+                )
+
+                if not matching_permissions:
+                    print(f"Не найдено разрешение для email: {user_email}")
+                    return None
+
+                user_id = matching_permissions
+
+            if self.drive_service:
+                return (
+                    self.drive_service.permissions()
+                    .delete(fileId=file_id, permissionId=user_id)
+                    .execute()
+                )
+
+        except HttpError as e:
+            if e.resp.status == 403:
+                print(
+                    f"У вас нет прав для просмотра документа с ID {file_id}. Проверьте права доступа."
+                )
+            else:
+                print(f"Ошибка при удалении разрешений для документа: {e}")
+
+        return None
+
+    def get_file_link(self, file: dict) -> str:
+        link: str = ""
+        mime_type = MimeTypes(file.get("mimeType", ""))
+
+        if mime_type == MimeTypes.FOLDER:
+            link = f"https://drive.google.com/drive/folders/{file['id']}"
+        elif mime_type == MimeTypes.DOCUMENT:
+            link = f"https://docs.google.com/document/d/{file['id']}/edit"
+
+        return link
+
 
 if __name__ == "__main__":
     credentials_file = "credentials.json"
@@ -164,13 +295,17 @@ if __name__ == "__main__":
     if google_api.authorize():
         ic("Авторизация прошла успешно.")
 
-        my_doc_id = "1Yaajv5eZ07AotqMunkJMWU0SdiSa5ZhSi6-7bg6yS3w"
-        ic(google_api.get_file_name(my_doc_id))
+        # Получить все файлы
+        if files := google_api.get_files():
+            for file in files.get("files", []):
+                file_name = file.get("name", "")
+                file_link = google_api.get_file_link(file)
+                ic(file_name, file_link)
 
-        # Получить список всех файлов
-        # ic(google_api.get_files())
+        # Получить разрешения
+        # file_url = ""
+        # permissions = google_api.get_permissions(file_id=file_url)
+        # ic(permissions)
 
-        # Удалить все файлы
-        # ic(google_api.delete_all_files())
     else:
         ic("Ошибка авторизации.")
